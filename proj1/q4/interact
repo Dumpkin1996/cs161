@@ -1,0 +1,19 @@
+#!/usr/bin/env python2
+
+from scaffold import *
+
+### YOUR CODE STARTS HERE ###
+
+# Example send:
+p.send('test\\x41\n')
+
+# Example receive:
+assert p.recvline() == 'testA'
+
+### YOUR CODE  ENDS  HERE ###
+
+returncode = p.end()
+
+if returncode == -6: print 'stack canary triggered!'
+elif returncode == -11: print 'segmentation fault!'
+elif returncode != 0: print 'return code', returncode
