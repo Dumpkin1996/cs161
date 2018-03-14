@@ -321,7 +321,7 @@ def run_part2_tests():
 
 
 if __name__ == "__main__":
-    print("PART 1 TESTS")
-    run_part1_tests()
+    #print("PART 1 TESTS")
+    #run_part1_tests()
     print("\nPART 2 TESTS")
     run_part2_tests()
