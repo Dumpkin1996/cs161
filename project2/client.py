@@ -76,6 +76,9 @@ class Client(BaseClient):
                 encrypted_file = self.encrypt_then_mac(file_encryption_key, file_mac_key, value)
                 self.storage_server.put(self.username + "/keys/" + pointer_id, "[POINTER]" + final_file_info)
                 self.storage_server.put(file_pointer, "[DATA]" + encrypted_file)
+                self.storage_server.put(self.username + "/children_of/" + pointer_id,
+                                        self.encrypt_then_mac(self.permanent_encryption_key, self.permanent_mac_key,
+                                                              json.dumps({})))
             else:
                 final_file_info = self.storage_server.get(self.username + "/keys/" + pointer_id)[9:]
                 encrypted_file_info = final_file_info[:-64]
@@ -155,6 +158,13 @@ class Client(BaseClient):
         message = share_node_id + share_node_encryption_key + share_node_mac_key
         encrypted_message = self.crypto.asymmetric_encrypt(message, self.pks.get_encryption_key(user))
         signature = self.crypto.asymmetric_sign(encrypted_message, self.rsa_priv_key)
+        if not self.storage_server.get(self.username + "/children_of/" + pointer_id) is None:
+            current_dict = json.loads(self.check_then_decrypt(self.permanent_encryption_key, self.permanent_mac_key,
+                                                              self.storage_server.get(self.username + "/children_of/" + pointer_id)))
+            current_dict[user] = message
+            self.storage_server.put(self.username + "/children_of/" + pointer_id,
+                                    self.encrypt_then_mac(self.permanent_encryption_key, self.permanent_mac_key,
+                                                          json.dumps(current_dict)))
         return encrypted_message + signature
 
     def receive_share(self, from_username, newname, message):
@@ -176,6 +186,33 @@ class Client(BaseClient):
 
 
     def revoke(self, user, name):
-        # Replace with your implementation (not needed for Part 1)
-        raise NotImplementedError
-
+        try:
+            pointer_id = self.crypto.message_authentication_code(name, self.permanent_filename_key, hash_name='SHA256')
+            file_value = self.download(name)
+            new_file_id = self.crypto.get_random_bytes(16)
+            new_file_pointer = self.username + "/data/" + new_file_id
+            new_file_encryption_key = self.crypto.get_random_bytes(16)
+            new_file_mac_key = self.crypto.get_random_bytes(16)
+            new_file_info = new_file_pointer + new_file_encryption_key + new_file_mac_key
+            new_encrypted_file_info = self.encrypt_then_mac(self.permanent_encryption_key, self.permanent_mac_key,
+                                                            new_file_info)
+            new_final_file_info = new_encrypted_file_info + self.crypto.message_authentication_code(new_encrypted_file_info + name,
+                                                                                                    self.permanent_filename_key,
+                                                                                                    hash_name='SHA256')
+            new_encrypted_file = self.encrypt_then_mac(new_file_encryption_key, new_file_mac_key, file_value)
+            self.storage_server.put(self.username + "/keys/" + pointer_id, "[POINTER]" + new_final_file_info)
+            self.storage_server.put(new_file_pointer, "[DATA]" + new_encrypted_file)
+            if not self.storage_server.get(self.username + "/children_of/" + pointer_id) is None:
+                children_dict = json.loads(self.check_then_decrypt(self.permanent_encryption_key, self.permanent_mac_key,
+                                                                   self.storage_server.get(self.username + "/children_of/" + pointer_id)))
+                for child in children_dict:
+                    if (child != user):
+                        share_node_id = children_dict[child][:32]
+                        share_node_encryption_key = children_dict[child][32:64]
+                        share_node_mac_key = children_dict[child][64:]
+                        new_share_node_content = new_file_pointer + new_file_encryption_key + new_file_mac_key
+                        new_encrypted_share_node_content = self.encrypt_then_mac(share_node_encryption_key,
+                                                                                 share_node_mac_key, new_share_node_content)
+                        self.storage_server.put(share_node_id, "[POINTER]" + new_encrypted_share_node_content)
+        except:
+            raise IntegrityError
