@@ -16,8 +16,7 @@ import json
 class Client(BaseClient):
     def __init__(self, storage_server, public_key_server, crypto_object,
                  username):
-        super().__init__(storage_server, public_key_server, crypto_object,
-                         username)
+        super().__init__(storage_server, public_key_server, crypto_object, username)
         self.permanent_encryption_key = self.get_permanent_keys()[:32]
         self.permanent_mac_key = self.get_permanent_keys()[32:64]
         self.permanent_filename_key = self.get_permanent_keys()[64:]
